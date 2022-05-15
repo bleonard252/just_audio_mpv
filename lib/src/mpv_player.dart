@@ -38,30 +38,30 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       mpvArgs: ["--audio-buffer=1", "--idle=yes"],
       verbose: true
     );
-    unawaited(mpv.start(mpv_args: mpv.mpvArgs).then((_) {
+    // unawaited(mpv.start(mpv_args: mpv.mpvArgs).then((_) {
+    mpv.on(MPVEvents.status, null, (ev, _) async {
+      await update();
+    });
+    mpv.on(MPVEvents.started, null, (ev, _) async {
+      await update();
+    });
+    mpv.on(MPVEvents.crashed, null, (ev, _) async {
       if (kDebugMode) {
-        print("MPV started");
+        print("[just_audio_mpv] MPV crashed");
       }
-      mpv.on(MPVEvents.status, null, (ev, _) async {
-        await update();
-      });
-      mpv.on(MPVEvents.started, null, (ev, _) async {
-        await update();
-      });
-      mpv.on(MPVEvents.crashed, null, (ev, _) async {
-        if (kDebugMode) {
-          print("MPV crashed");
-        }
-      });
-      mpv.on(MPVEvents.quit, null, (ev, _) async {
-        if (kDebugMode) {
-          print("MPV exited");
-        }
-      });
-      mpv.on(MPVEvents.timeposition, null, (ev, _) async {
-        await update(updatePosition: Duration(seconds: ev.eventData as int));
-      });
-    }));
+    });
+    mpv.on(MPVEvents.quit, null, (ev, _) async {
+      if (kDebugMode) {
+        print("[just_audio_mpv] MPV exited");
+      }
+    });
+    mpv.on(MPVEvents.timeposition, null, (ev, _) async {
+      await update(updatePosition: Duration(seconds: ev.eventData as int));
+    });
+    // }));
+    if (kDebugMode) {
+      print("[just_audio_mpv] MPV started");
+    }
   }
 
   release() async {
@@ -73,8 +73,8 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     if (kDebugMode) {
+      print("[just_audio_mpv] Starting to load...");
       print(request.audioSourceMessage.toMap());
-      print("It's time to begin");
     }
     if (request.audioSourceMessage is ClippingAudioSourceMessage) {
       await mpv.load((request.audioSourceMessage as ClippingAudioSourceMessage).child.uri, options: [
