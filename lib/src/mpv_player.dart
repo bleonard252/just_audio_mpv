@@ -8,6 +8,8 @@ import 'package:mpv_dart/mpv_dart.dart';
 
 class JustAudioMPVPlayer extends AudioPlayerPlatform {
   late final MPVPlayer mpv;
+  late final Future<void> willBeReady;
+  bool isReady = false;
   final _eventController = StreamController<PlaybackEventMessage>.broadcast();
   @override
   get playbackEventMessageStream => _eventController.stream;
@@ -17,7 +19,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
 
   Future<void> update({Duration? updatePosition, Duration? bufferedPosition, Duration? duration, IcyMetadataMessage? icyMetadata, int? currentIndex}) async {
     _eventController.add(PlaybackEventMessage(
-      processingState: (await mpv.getDuration().onError((_,__) => -1) == -1) ? ProcessingStateMessage.idle
+      processingState: (await mpv.getDuration().onError((_,__) => 0) == 0) ? ProcessingStateMessage.idle
       : (await mpv.getProperty("seeking")) ? ProcessingStateMessage.loading
       : ProcessingStateMessage.ready,
       updateTime: DateTime.now(),
@@ -25,26 +27,36 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       bufferedPosition: bufferedPosition ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
       duration: duration ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
       icyMetadata: icyMetadata,
-      currentIndex: currentIndex ?? await mpv.getPlaylistPosition().onError((_,__) => 0),
+      currentIndex: currentIndex ?? await mpv.getPlaylistPosition().onError((_,__) => 0).then((value) => value == -1 ? 0 : value),
       androidAudioSessionId: null
     ));
   }
 
   JustAudioMPVPlayer({required String id}) : super(id) {
+    final completer = Completer();
+    willBeReady = completer.future;
     mpv = MPVPlayer(
       audioOnly: true,
       timeUpdate: 1,
       socketURI: Platform.isWindows ? '\\\\.\\pipe\\mpvserver-$id' : '/tmp/MPV_Dart-$id.sock',
       mpvArgs: ["--audio-buffer=1", "--idle=yes"],
-      verbose: true
+      verbose: true,
+      debug: true
     );
     // unawaited(mpv.start(mpv_args: mpv.mpvArgs).then((_) {
     mpv.on(MPVEvents.status, null, (ev, _) async {
       await update();
     });
-    mpv.on(MPVEvents.started, null, (ev, _) async {
-      await update();
-    });
+    mpv.start().then(((value) {
+      if (!completer.isCompleted) completer.complete();
+      isReady = true;
+      if (kDebugMode) {
+        print("[just_audio_mpv] MPV started");
+      }
+    }));
+    // mpv.on(MPVEvents.started, null, (ev, _) async {
+
+    // });
     mpv.on(MPVEvents.crashed, null, (ev, _) async {
       if (kDebugMode) {
         print("[just_audio_mpv] MPV crashed");
@@ -58,10 +70,6 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     mpv.on(MPVEvents.timeposition, null, (ev, _) async {
       await update(updatePosition: Duration(seconds: ev.eventData as int));
     });
-    // }));
-    if (kDebugMode) {
-      print("[just_audio_mpv] MPV started");
-    }
   }
 
   release() async {
@@ -137,6 +145,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
 
   @override
   Future<SetVolumeResponse> setVolume(SetVolumeRequest request) async {
+    if (request.volume > 1.3) return SetVolumeResponse();
     await mpv.volume(request.volume * 100);
     return SetVolumeResponse();
   }

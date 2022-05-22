@@ -18,6 +18,7 @@ class JustAudioMpv extends JustAudioPlatform {
           message: "Platform player ${request.id} already exists");
     }
     final player = JustAudioMPVPlayer(id: request.id);
+    if (!player.isReady) await player.willBeReady;
     players[request.id] = player;
     return player;
   }
