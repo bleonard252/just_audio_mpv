@@ -27,7 +27,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       bufferedPosition: bufferedPosition ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
       duration: duration ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
       icyMetadata: icyMetadata,
-      currentIndex: currentIndex ?? await mpv.getPlaylistPosition().onError((_,__) => 0).then((value) => value == -1 ? 0 : value),
+      currentIndex: currentIndex ?? await mpv.getPlaylistPosition().onError((_,__) => 0).then((value) => value < 0 ? 0 : value),
       androidAudioSessionId: null
     ));
   }
@@ -39,13 +39,14 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       audioOnly: true,
       timeUpdate: 1,
       socketURI: Platform.isWindows ? '\\\\.\\pipe\\mpvserver-$id' : '/tmp/MPV_Dart-$id.sock',
-      mpvArgs: ["--audio-buffer=1", "--idle=yes"],
-      verbose: true,
-      debug: true
+      mpvArgs: ["--audio-buffer=1", "--idle=yes"]
     );
     // unawaited(mpv.start(mpv_args: mpv.mpvArgs).then((_) {
     mpv.on(MPVEvents.status, null, (ev, _) async {
       await update();
+    });
+    mpv.on(MPVEvents.paused, null, (ev, _) async {
+      _dataController.add(PlayerDataMessage(playing: false));
     });
     mpv.start().then(((value) {
       if (!completer.isCompleted) completer.complete();
@@ -54,13 +55,11 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
         print("[just_audio_mpv] MPV started");
       }
     }));
-    // mpv.on(MPVEvents.started, null, (ev, _) async {
-
-    // });
-    mpv.on(MPVEvents.crashed, null, (ev, _) async {
-      if (kDebugMode) {
-        print("[just_audio_mpv] MPV crashed");
-      }
+    mpv.on(MPVEvents.resumed, null, (ev, _) async {
+      _dataController.add(PlayerDataMessage(playing: true));
+    });
+    mpv.on(MPVEvents.started, null, (ev, _) async {
+      _dataController.add(PlayerDataMessage(playing: true));
     });
     mpv.on(MPVEvents.quit, null, (ev, _) async {
       if (kDebugMode) {
@@ -68,11 +67,25 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       }
     });
     mpv.on(MPVEvents.timeposition, null, (ev, _) async {
-      await update(updatePosition: Duration(seconds: ev.eventData as int));
+      final _duration = await mpv.getDuration();
+      final _bufferedTo = await mpv.getProperty("demuxer-cache-time");
+      if (kDebugMode) {
+        print(ev.eventData);
+        print(_duration);
+        print(_bufferedTo);
+      }
+      await update(
+        updatePosition: Duration(milliseconds: ((ev.eventData as double) * 1000).truncate()),
+        bufferedPosition: (_bufferedTo??-1) < 0 ? null : Duration(milliseconds: (_bufferedTo * 1000).truncate()),
+        duration: _duration < 0 ? null : Duration(milliseconds: (_duration * 1000).truncate())
+      );
     });
   }
 
   release() async {
+    if (kDebugMode) {
+      print("[just_audio_mpv] Quitting at request");
+    }
     await _eventController.close();
     await _dataController.close();
     await mpv.quit();
@@ -117,7 +130,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       throw UnsupportedError("${request.audioSourceMessage.runtimeType.toString()} is not supported");
     }
     await update();
-    return LoadResponse(duration: Duration(milliseconds: (await mpv.getDuration() * 1000).truncate()));
+    return LoadResponse(duration: const Duration(days: 365));
   }
 
   @override
