@@ -18,18 +18,20 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   get playerDataMessageStream => _dataController.stream;
 
   Future<void> update({Duration? updatePosition, Duration? bufferedPosition, Duration? duration, IcyMetadataMessage? icyMetadata, int? currentIndex}) async {
-    _eventController.add(PlaybackEventMessage(
-      processingState: (await mpv.getDuration().onError((_,__) => 0) == 0) ? ProcessingStateMessage.idle
-      : (await mpv.getProperty("seeking")) ? ProcessingStateMessage.loading
-      : ProcessingStateMessage.ready,
-      updateTime: DateTime.now(),
-      updatePosition: updatePosition ?? Duration(milliseconds: (await mpv.getTimePosition().onError((_,__) => 0) * 1000).truncate()),
-      bufferedPosition: bufferedPosition ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
-      duration: duration ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
-      icyMetadata: icyMetadata,
-      currentIndex: currentIndex ?? await mpv.getPlaylistPosition().onError((_,__) => 0).then((value) => value < 0 ? 0 : value),
-      androidAudioSessionId: null
-    ));
+    if (_eventController.isClosed == false) {
+      _eventController.add(PlaybackEventMessage(
+        processingState: (await mpv.getProperty("seeking")) ? ProcessingStateMessage.loading
+        : (await mpv.getDuration().onError((_,__) => 0) == 0) ? ProcessingStateMessage.idle
+        : ProcessingStateMessage.ready,
+        updateTime: DateTime.now(),
+        updatePosition: updatePosition ?? Duration(milliseconds: (await mpv.getTimePosition().onError((_,__) => 0) * 1000).truncate()),
+        bufferedPosition: bufferedPosition ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
+        duration: duration ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
+        icyMetadata: icyMetadata,
+        currentIndex: currentIndex ?? await mpv.getPlaylistPosition().onError((_,__) => 0).then((value) => value < 0 ? 0 : value),
+        androidAudioSessionId: null
+      ));
+    }
   }
 
   JustAudioMPVPlayer({required String id}) : super(id) {
@@ -39,7 +41,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       audioOnly: true,
       timeUpdate: 1,
       socketURI: Platform.isWindows ? '\\\\.\\pipe\\mpvserver-$id' : '/tmp/MPV_Dart-$id.sock',
-      mpvArgs: ["--audio-buffer=1", "--idle=yes"]
+      mpvArgs: ["audio-buffer=1", "idle=yes"],
     );
     // unawaited(mpv.start(mpv_args: mpv.mpvArgs).then((_) {
     mpv.on(MPVEvents.status, null, (ev, _) async {
@@ -69,11 +71,11 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     mpv.on(MPVEvents.timeposition, null, (ev, _) async {
       final _duration = await mpv.getDuration();
       final _bufferedTo = await mpv.getProperty("demuxer-cache-time");
-      if (kDebugMode) {
-        print(ev.eventData);
-        print(_duration);
-        print(_bufferedTo);
-      }
+      // if (kDebugMode) {
+      //   print(ev.eventData);
+      //   print(_duration);
+      //   print(_bufferedTo);
+      // }
       await update(
         updatePosition: Duration(milliseconds: ((ev.eventData as double) * 1000).truncate()),
         bufferedPosition: (_bufferedTo??-1) < 0 ? null : Duration(milliseconds: (_bufferedTo * 1000).truncate()),
@@ -86,9 +88,14 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     if (kDebugMode) {
       print("[just_audio_mpv] Quitting at request");
     }
-    await _eventController.close();
-    await _dataController.close();
-    await mpv.quit();
+    if (await mpv.isRunning()) {
+      await _eventController.close();
+      await _dataController.close();
+      //await mpv.socket.quit();
+      try {
+        await mpv.quit();
+      } finally {}
+    }
   }
 
   @override
@@ -104,7 +111,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       ]);
     } else if (request.audioSourceMessage is UriAudioSourceMessage) {
       await mpv.load((request.audioSourceMessage as UriAudioSourceMessage).uri);
-    } else if (request.audioSourceMessage is IndexedAudioSourceMessage) {
+    } else if (request.audioSourceMessage is ConcatenatingAudioSourceMessage) {
       await mpv.clearPlaylist();
       for (final message in (request.audioSourceMessage as ConcatenatingAudioSourceMessage).children) {
         if (request.audioSourceMessage is ClippingAudioSourceMessage) {
@@ -114,7 +121,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
           ], mode: LoadMode.append);
         } else if (message is UriAudioSourceMessage) {
           await mpv.load(message.uri, mode: LoadMode.append);
-        } else if (message is IndexedAudioSourceMessage) {
+        } else if (message is ConcatenatingAudioSourceMessage) {
           throw UnsupportedError("nested ${message.runtimeType.toString()} is not supported");
         } else if (message is SilenceAudioSourceMessage) {
           await mpv.load("av://lavfi:anullsrc=d=${message.duration.inMilliseconds}ms", mode: LoadMode.append);
@@ -123,13 +130,15 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
         }
       }
       if (request.initialIndex != null) await mpv.setProperty("playlist-start", request.initialIndex);
+      if (request.initialIndex != null) await mpv.setProperty("playlist-pos", request.initialIndex);
       if (request.initialPosition != null) await mpv.setProperty("start", request.initialPosition!.inMilliseconds / 1000);
     } else if (request.audioSourceMessage is SilenceAudioSourceMessage) {
       await mpv.load("av://lavfi:anullsrc=d=${(request.audioSourceMessage as SilenceAudioSourceMessage).duration.inMilliseconds}ms", mode: LoadMode.append);
     } else {
       throw UnsupportedError("${request.audioSourceMessage.runtimeType.toString()} is not supported");
     }
-    await update();
+    //await update();
+    print("[just_audio_mpv] Loaded.");
     return LoadResponse(duration: const Duration(days: 365));
   }
 
@@ -152,7 +161,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   @override
   Future<SeekResponse> seek(SeekRequest request) async {
     if (request.index != null) await mpv.command("playlist-play-index", [request.index!.toString()]);
-    if (request.position != null) await mpv.seek(request.position!.inMilliseconds / 1000);
+    if (request.position != null) await mpv.seek(request.position!.inMilliseconds / 1000, mode: SeekMode.absolute);
     return SeekResponse();
   }
 
