@@ -116,20 +116,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       await mpv.load((request.audioSourceMessage as UriAudioSourceMessage).uri);
     } else if (request.audioSourceMessage is ConcatenatingAudioSourceMessage) {
       for (final message in (request.audioSourceMessage as ConcatenatingAudioSourceMessage).children) {
-        if (request.audioSourceMessage is ClippingAudioSourceMessage) {
-          await mpv.load((message as ClippingAudioSourceMessage).child.uri, options: [
-            if (message.start != null) "start=.${message.start!.inMilliseconds}",
-            if (message.end != null) "end=.${message.end!.inMilliseconds}",
-          ], mode: LoadMode.append);
-        } else if (message is UriAudioSourceMessage) {
-          await mpv.load(message.uri, mode: LoadMode.append);
-        } else if (message is ConcatenatingAudioSourceMessage) {
-          throw UnsupportedError("nested ${message.runtimeType.toString()} is not supported");
-        } else if (message is SilenceAudioSourceMessage) {
-          await mpv.load("av://lavfi:anullsrc=d=${message.duration.inMilliseconds}ms", mode: LoadMode.append);
-        } else {
-          throw UnsupportedError("${message.runtimeType.toString()} is not supported");
-        }
+        await _concatenatingInsert(message);
       }
       //if (request.initialIndex != null) await mpv.setProperty("playlist-start", request.initialIndex);
       //if (request.initialIndex != null) await mpv.setProperty("playlist-pos", request.initialIndex);
@@ -209,5 +196,42 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     return SetShuffleModeResponse();
   }
 
+  Future<void> _concatenatingInsert(AudioSourceMessage message) async {
+    if (message is ClippingAudioSourceMessage) {
+      await mpv.load(message.child.uri, options: [
+        if (message.start != null) "start=.${message.start!.inMilliseconds}",
+        if (message.end != null) "end=.${message.end!.inMilliseconds}",
+      ], mode: LoadMode.append);
+    } else if (message is UriAudioSourceMessage) {
+      await mpv.load(message.uri, mode: LoadMode.append);
+    } else if (message is ConcatenatingAudioSourceMessage) {
+      throw UnsupportedError("nested ${message.runtimeType.toString()} is not supported");
+    } else if (message is SilenceAudioSourceMessage) {
+      await mpv.load("av://lavfi:anullsrc=d=${message.duration.inMilliseconds}ms", mode: LoadMode.append);
+    } else {
+      throw UnsupportedError("${message.runtimeType.toString()} is not supported");
+    }
+  }
+
+  @override
+  Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(ConcatenatingInsertAllRequest request) async {
+    for (final source in request.children.reversed) {
+      await _concatenatingInsert(source);
+      await mpv.playlistMove(await mpv.getPlaylistSize(), request.index);
+    }
+    return ConcatenatingInsertAllResponse();
+  }
+  @override
+  Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(ConcatenatingRemoveRangeRequest request) async {
+    for (var i = 0; i < request.endIndex-request.startIndex; i++) {
+      await mpv.playlistRemove(request.startIndex+i);
+    }
+    return ConcatenatingRemoveRangeResponse();
+  }
+  @override
+  Future<ConcatenatingMoveResponse> concatenatingMove(ConcatenatingMoveRequest request) async {
+    await mpv.playlistMove(request.currentIndex, request.newIndex);
+    return ConcatenatingMoveResponse();
+  }
 
 }
