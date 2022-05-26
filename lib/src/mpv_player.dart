@@ -43,6 +43,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       socketURI: Platform.isWindows ? '\\\\.\\pipe\\mpvserver-$id' : '/tmp/MPV_Dart-$id.sock',
       mpvArgs: ["audio-buffer=1", "idle=yes"],
     );
+    mpv.stop();
     // unawaited(mpv.start(mpv_args: mpv.mpvArgs).then((_) {
     mpv.on(MPVEvents.status, null, (ev, _) async {
       await update();
@@ -93,6 +94,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       await _dataController.close();
       //await mpv.socket.quit();
       try {
+        await mpv.stop();
         await mpv.quit();
       } finally {}
     }
@@ -104,6 +106,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       print("[just_audio_mpv] Starting to load...");
       print(request.audioSourceMessage.toMap());
     }
+    await mpv.clearPlaylist();
     if (request.audioSourceMessage is ClippingAudioSourceMessage) {
       await mpv.load((request.audioSourceMessage as ClippingAudioSourceMessage).child.uri, options: [
         if ((request.audioSourceMessage as ClippingAudioSourceMessage).start != null) "start=.${(request.audioSourceMessage as ClippingAudioSourceMessage).start!.inMilliseconds}",
@@ -112,7 +115,6 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     } else if (request.audioSourceMessage is UriAudioSourceMessage) {
       await mpv.load((request.audioSourceMessage as UriAudioSourceMessage).uri);
     } else if (request.audioSourceMessage is ConcatenatingAudioSourceMessage) {
-      await mpv.clearPlaylist();
       for (final message in (request.audioSourceMessage as ConcatenatingAudioSourceMessage).children) {
         if (request.audioSourceMessage is ClippingAudioSourceMessage) {
           await mpv.load((message as ClippingAudioSourceMessage).child.uri, options: [
@@ -129,8 +131,9 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
           throw UnsupportedError("${message.runtimeType.toString()} is not supported");
         }
       }
-      if (request.initialIndex != null) await mpv.setProperty("playlist-start", request.initialIndex);
-      if (request.initialIndex != null) await mpv.setProperty("playlist-pos", request.initialIndex);
+      //if (request.initialIndex != null) await mpv.setProperty("playlist-start", request.initialIndex);
+      //if (request.initialIndex != null) await mpv.setProperty("playlist-pos", request.initialIndex);
+      if (request.initialIndex != null) await mpv.command("playlist-play-index", [request.initialIndex!.toString()]);
       if (request.initialPosition != null) await mpv.setProperty("start", request.initialPosition!.inMilliseconds / 1000);
     } else if (request.audioSourceMessage is SilenceAudioSourceMessage) {
       await mpv.load("av://lavfi:anullsrc=d=${(request.audioSourceMessage as SilenceAudioSourceMessage).duration.inMilliseconds}ms", mode: LoadMode.append);
