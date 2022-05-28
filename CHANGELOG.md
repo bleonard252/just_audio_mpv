@@ -1,3 +1,7 @@
+## 0.1.2
+* Fix "property unavailable" bug
+* Update README
+
 ## 0.1.1
 * Work around the app restarting on the last thing that was played
 * Concatenation insert/remove/move support
