@@ -20,7 +20,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   Future<void> update({Duration? updatePosition, Duration? bufferedPosition, Duration? duration, IcyMetadataMessage? icyMetadata, int? currentIndex}) async {
     if (_eventController.isClosed == false) {
       _eventController.add(PlaybackEventMessage(
-        processingState: (await mpv.getProperty("seeking")) ? ProcessingStateMessage.loading
+        processingState: ((await mpv.getProperty("seeking").catchError((_) => false)) as bool) ? ProcessingStateMessage.loading
         : (await mpv.getDuration().onError((_,__) => 0) == 0) ? ProcessingStateMessage.idle
         : ProcessingStateMessage.ready,
         updateTime: DateTime.now(),
