@@ -10,6 +10,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   late final MPVPlayer mpv;
   late final Future<void> willBeReady;
   bool isReady = false;
+  bool idle = false;
   final _eventController = StreamController<PlaybackEventMessage>.broadcast();
   @override
   get playbackEventMessageStream => _eventController.stream;
@@ -20,8 +21,8 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   Future<void> update({Duration? updatePosition, Duration? bufferedPosition, Duration? duration, IcyMetadataMessage? icyMetadata, int? currentIndex}) async {
     if (_eventController.isClosed == false) {
       _eventController.add(PlaybackEventMessage(
-        processingState: ((await mpv.getProperty("seeking").catchError((_) => false)) as bool) ? ProcessingStateMessage.loading
-        : (await mpv.getDuration().onError((_,__) => 0) == 0) ? ProcessingStateMessage.idle
+        processingState: idle ? ProcessingStateMessage.idle
+        : (await mpv.getDuration().onError((_,__) => 0) == 0) ? ProcessingStateMessage.loading
         : ProcessingStateMessage.ready,
         updateTime: DateTime.now(),
         updatePosition: updatePosition ?? Duration(milliseconds: (await mpv.getTimePosition().onError((_,__) => 0) * 1000).truncate()),
@@ -44,6 +45,9 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       mpvArgs: ["audio-buffer=1", "idle=yes"],
     );
     mpv.stop();
+    mpv.on("idle", null, (ev, _) async {
+      idle = true;
+    });
     // unawaited(mpv.start(mpv_args: mpv.mpvArgs).then((_) {
     mpv.on(MPVEvents.status, null, (ev, _) async {
       await update();
@@ -60,9 +64,11 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     }));
     mpv.on(MPVEvents.resumed, null, (ev, _) async {
       _dataController.add(PlayerDataMessage(playing: true));
+      idle = false;
     });
     mpv.on(MPVEvents.started, null, (ev, _) async {
       _dataController.add(PlayerDataMessage(playing: true));
+      idle = false;
     });
     mpv.on(MPVEvents.quit, null, (ev, _) async {
       if (kDebugMode) {
