@@ -1,6 +1,6 @@
 name: just_audio_mpv
 description: Use the installed MPV as a backend for playing audio.
-version: 0.1.2
+version: 0.1.3
 homepage: https://github.com/bleonard252/just_audio_mpv
 
 environment:
@@ -39,6 +39,6 @@ flutter:
       linux:
         dartPluginClass: JustAudioMpv
         fileName: just_audio_mpv.dart
-      windows:
-        dartPluginClass: JustAudioMpv
-        fileName: just_audio_mpv.dart
+      # windows:
+      #   dartPluginClass: JustAudioMpv
+      #   fileName: just_audio_mpv.dart

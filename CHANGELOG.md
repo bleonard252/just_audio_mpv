@@ -1,3 +1,7 @@
+## 0.1.3
+* Various bug fixes
+* Remove Windows (mpv_dart apparently doesn't support it) and add Fedora
+
 ## 0.1.2
 * Fix "property unavailable" bug
 * Update README
