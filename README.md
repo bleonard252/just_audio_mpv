@@ -17,6 +17,11 @@ For Arch, get `https://aur.archlinux.org/packages/mpv-git/` via AUR and install 
 yay -S mpv-git
 ```
 
+For Fedora:
+```
+sudo yum install mpv
+```
+
 If your app is to be packaged as a Flatpak, you can add `io.mpv.Mpv` as a dependency (don't ask me how, I've never built for it).
 
 For other distributions, you might want to look into https://mpv.io/installation/.
