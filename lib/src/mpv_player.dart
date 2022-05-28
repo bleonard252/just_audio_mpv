@@ -20,14 +20,15 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
 
   Future<void> update({Duration? updatePosition, Duration? bufferedPosition, Duration? duration, IcyMetadataMessage? icyMetadata, int? currentIndex}) async {
     if (_eventController.isClosed == false) {
+      final _duration = Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate());
       _eventController.add(PlaybackEventMessage(
         processingState: idle ? ProcessingStateMessage.idle
         : (await mpv.getDuration().onError((_,__) => 0) == 0) ? ProcessingStateMessage.loading
         : ProcessingStateMessage.ready,
         updateTime: DateTime.now(),
-        updatePosition: updatePosition ?? Duration(milliseconds: (await mpv.getTimePosition().onError((_,__) => 0) * 1000).truncate()),
-        bufferedPosition: bufferedPosition ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
-        duration: duration ?? Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate()),
+        updatePosition: (updatePosition ?? Duration(milliseconds: (await mpv.getTimePosition().onError((_,__) => 0) * 1000).truncate().clamp(0, _duration.inMilliseconds))),
+        bufferedPosition: bufferedPosition ?? _duration,
+        duration: duration ?? _duration,
         icyMetadata: icyMetadata,
         currentIndex: currentIndex ?? await mpv.getPlaylistPosition().onError((_,__) => 0).then((value) => value < 0 ? 0 : value),
         androidAudioSessionId: null
@@ -223,7 +224,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(ConcatenatingInsertAllRequest request) async {
     for (final source in request.children.reversed) {
       await _concatenatingInsert(source);
-      await mpv.playlistMove(await mpv.getPlaylistSize(), request.index);
+      await mpv.playlistMove(await mpv.getPlaylistSize()-1, request.index);
     }
     return ConcatenatingInsertAllResponse();
   }
