@@ -29,7 +29,8 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       _eventController.add(PlaybackEventMessage(
         processingState: _state,
         updateTime: DateTime.now(),
-        updatePosition: (updatePosition ?? Duration(milliseconds: (await mpv.getTimePosition().onError((_,__) => 0) * 1000).truncate().clamp(0, _duration.inMilliseconds))),
+        updatePosition: Duration(milliseconds: (updatePosition?.inMilliseconds ?? await mpv.getTimePosition().onError((_,__) => 0) * 1000)
+          .clamp(0, (duration ?? _duration).inMilliseconds).truncate()),
         bufferedPosition: bufferedPosition ?? _duration,
         duration: duration ?? _duration,
         icyMetadata: icyMetadata,
