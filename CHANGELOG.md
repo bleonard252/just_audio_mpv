@@ -1,3 +1,6 @@
+## 0.1.4
+* Bug fixes, including the slider min-max assertion bug and one more "property unavailable"
+
 ## 0.1.3
 * Various bug fixes
 * Remove Windows (mpv_dart apparently doesn't support it) and add Fedora

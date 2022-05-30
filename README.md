@@ -22,11 +22,34 @@ For Fedora:
 sudo yum install mpv
 ```
 
-If your app is to be packaged as a Flatpak, you can add `io.mpv.Mpv` as a dependency (don't ask me how, I've never built for it).
+If your app is to be packaged as a Flatpak, you can add `io.mpv.Mpv` as a dependency (don't ask me how, I've never built for it) or bundle a custom build.
 
 For other distributions, you might want to look into https://mpv.io/installation/.
 
-Currently it is not possible to tell `just_audio_mpv` to use a bundled `mpv`.
+Currently it is not possible to tell `just_audio_mpv` to use an asset-bundled `mpv`.
+
+## Checking for MPV
+To check whether MPV is installed, first check if it's going to be used (with `if (Platform.isLinux)`), then check the exit code of the command `which mpv`. If it returns `0`, MPV is present and you can continue. If it returns `1`, MPV is not present. Any other error codes are likely indicative of the `which` command not being present-- good luck getting a Flutter app to run on a machine that doesn't have basic tools like `which`.
+
+```dart
+// In a synchronous environment, optimally before the runApp(MyApp()) call and/or with a
+// splash/loading screen available:
+// (Note: asynchronous is preferred where possible, but `which` is an instant command
+// so running it synchronously should not hurt performance.)
+if (Platform.isLinux && Process.runSync("which", ["mpv"]).exitCode != 0) {
+  // Tell the user somehow that MPV is not installed,
+  // point them to this page, and prevent them from
+  // trying to play audio.
+}
+// If you're running in an environment where audio support is considered absent by default,
+// you can check for MPV's presence asynchronously like this:
+final which = Process.run("which", ["mpv"]);
+if (which.exitCode == 0) {
+  canPlayAudio = true;
+}
+```
+
+For Windows the command would be `Get-Command` for PowerShell and `where` for CMD.
 
 ## Features
 

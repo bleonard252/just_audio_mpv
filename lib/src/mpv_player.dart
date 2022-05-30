@@ -25,16 +25,16 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   Future<void> update({Duration? updatePosition, Duration? bufferedPosition, Duration? duration, IcyMetadataMessage? icyMetadata, int? currentIndex}) async {
     if (_eventController.isClosed == false) {
       // ignore: no_leading_underscores_for_local_identifiers
-      final _duration = Duration(milliseconds: (await mpv.getDuration().onError((_,__) => 0) * 1000).truncate());
+      final _duration = Duration(milliseconds: (await mpv.getDuration().catchError((_) => 0.0) * 1000).truncate());
       _eventController.add(PlaybackEventMessage(
         processingState: _state,
         updateTime: DateTime.now(),
-        updatePosition: Duration(milliseconds: (updatePosition?.inMilliseconds ?? await mpv.getTimePosition().onError((_,__) => 0) * 1000)
+        updatePosition: Duration(milliseconds: (updatePosition?.inMilliseconds ?? await mpv.getTimePosition().catchError((_) => 0.0) * 1000)
           .clamp(0, (duration ?? _duration).inMilliseconds).truncate()),
         bufferedPosition: bufferedPosition ?? _duration,
         duration: duration ?? _duration,
         icyMetadata: icyMetadata,
-        currentIndex: currentIndex ?? await mpv.getPlaylistPosition().onError((_,__) => 0).then((value) => value < 0 ? 0 : value),
+        currentIndex: currentIndex ?? await mpv.getPlaylistPosition().catchError((_) => 0).then((value) => value < 0 ? 0 : value),
         androidAudioSessionId: null
       ));
     }
@@ -93,8 +93,8 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       }
     });
     mpv.on(MPVEvents.timeposition, null, (ev, _) async {
-      final _duration = await mpv.getDuration();
-      final _bufferedTo = await mpv.getProperty("demuxer-cache-time");
+      final _duration = await mpv.getDuration().catchError(() => -1);
+      final _bufferedTo = await mpv.getProperty("demuxer-cache-time").catchError(() => -1);
       // if (kDebugMode) {
       //   print(ev.eventData);
       //   print(_duration);
