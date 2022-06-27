@@ -93,8 +93,8 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       }
     });
     mpv.on(MPVEvents.timeposition, null, (ev, _) async {
-      final _duration = await mpv.getDuration().catchError(() => -1);
-      final _bufferedTo = await mpv.getProperty("demuxer-cache-time").catchError(() => -1);
+      final _duration = await mpv.getDuration().catchError((_, __) => -1);
+      final _bufferedTo = await mpv.getProperty("demuxer-cache-time").catchError((_, __) => -1);
       // if (kDebugMode) {
       //   print(ev.eventData);
       //   print(_duration);
