@@ -1,3 +1,6 @@
+## 0.1.5
+* Fix the "catchError expecting arguments" bug
+
 ## 0.1.4
 * Bug fixes, including the slider min-max assertion bug and one more "property unavailable"
 
