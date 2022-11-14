@@ -1,3 +1,6 @@
+## 0.1.6
+* Add a settable logging global, which prints to console by default
+
 ## 0.1.5
 * Fix the "catchError expecting arguments" bug
 

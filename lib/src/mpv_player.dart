@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:developer';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:mpv_dart/mpv_dart.dart';
+
+import '../just_audio_mpv.dart';
 
 /// Shorthand for processing states.
 typedef _State = ProcessingStateMessage;
@@ -65,9 +66,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     mpv.start().then(((value) {
       if (!completer.isCompleted) completer.complete();
       isReady = true;
-      if (kDebugMode) {
-        print("[just_audio_mpv] MPV started");
-      }
+      mpvLog("MPV $id started", level: JAMPV_LogLevel.info);
       _setState(_State.ready);
       update();
     }));
@@ -88,18 +87,11 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     mpv.on(MPVEvents.quit, null, (ev, _) async {
       _setState(_State.idle);
       update();
-      if (kDebugMode) {
-        print("[just_audio_mpv] MPV exited");
-      }
+      mpvLog("MPV $id exited", level: JAMPV_LogLevel.warning);
     });
     mpv.on(MPVEvents.timeposition, null, (ev, _) async {
       final _duration = await mpv.getDuration().catchError((_, __) => -1);
       final _bufferedTo = await mpv.getProperty("demuxer-cache-time").catchError((_, __) => -1);
-      // if (kDebugMode) {
-      //   print(ev.eventData);
-      //   print(_duration);
-      //   print(_bufferedTo);
-      // }
       await update(
         updatePosition: Duration(milliseconds: ((ev.eventData as double) * 1000).truncate()),
         bufferedPosition: (_bufferedTo??-1) < 0 ? null : Duration(milliseconds: (_bufferedTo * 1000).truncate()),
@@ -109,9 +101,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   }
 
   release() async {
-    if (kDebugMode) {
-      print("[just_audio_mpv] Quitting at request");
-    }
+    mpvLog("MPV $id quitting at request", level: JAMPV_LogLevel.info);
     if (await mpv.isRunning()) {
       await _eventController.close();
       await _dataController.close();
@@ -123,10 +113,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
-    if (kDebugMode) {
-      print("[just_audio_mpv] Starting to load...");
-      print(request.audioSourceMessage.toMap());
-    }
+    mpvLog("MPV $id loading track...", level: JAMPV_LogLevel.verbose, error: request.audioSourceMessage.toMap());
     _setState(_State.loading);
     update();
     await mpv.clearPlaylist();
@@ -154,9 +141,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     }
     //await update();
     _setState(_State.ready);
-    if (kDebugMode) {
-      print("[just_audio_mpv] Loaded.");
-    }
+    mpvLog("MPV $id loaded track", level: JAMPV_LogLevel.verbose);
     return LoadResponse(duration: const Duration(days: 365));
   }
 
@@ -244,9 +229,17 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
 
   @override
   Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(ConcatenatingInsertAllRequest request) async {
+    //final length = await mpv.getPlaylistSize();
+    //mpvLog("D: ConcatenatingInsertAll", error: {"request.index": request.index, "length": length}, level: JAMPV_LogLevel.verbose);
     for (final source in request.children.reversed) {
       await _concatenatingInsert(source);
-      await mpv.playlistMove(await mpv.getPlaylistSize()-1, request.index);
+      final length = await mpv.getPlaylistSize();
+      if (length == 0) continue;
+      if (request.index < (length-1) && request.index >= 0) {
+        await mpv.playlistMove(length-1, request.index);
+      } else if (request.index == length) {
+        //await mpv.playlistMove(length-1, length-2);
+      }
     }
     return ConcatenatingInsertAllResponse();
   }

@@ -51,6 +51,28 @@ if (which.exitCode == 0) {
 
 For Windows the command would be `Get-Command` for PowerShell and `where` for CMD.
 
+## Logging
+If you want centralized, controlled, or pretty logging, you can use the below example to tell `just_audio_mpv` to log to wherever you want instead. It logs to console by default, so for most debugging purposes nothing needs to be done.
+
+**Please note:** the `dynamic error` parameter may include non-error information that may be useful in debugging, such as what track it is attempting to load. It is typically null.
+
+```dart
+// Map your various log levels to MPV's:
+const _logLevelMap = {
+  JAMPV_LogLevel.debug: LogLevel.debug,
+  JAMPV_LogLevel.info: LogLevel.info,
+  JAMPV_LogLevel.warning: LogLevel.warning,
+  JAMPV_LogLevel.error: LogLevel.error,
+  JAMPV_LogLevel.verbose: LogLevel.verbose,
+  JAMPV_LogLevel.none: LogLevel.debug,
+};
+mpvLog = (dynamic message, {dynamic error, JAMPV_LogLevel level = JAMPV_LogLevel.debug, StackTrace stackTrace}) {
+  // Run your logging function of choice here.
+  // For example, if using Pinelogger:
+  justAudioMpvPinelogger.log(message, severity: _logLevelMap[level]!, error: error, stackTrace: stackTrace);
+};
+```
+
 ## Features
 
 | Feature                        |  Linux |
