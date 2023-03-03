@@ -53,6 +53,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       mpvArgs: ["audio-buffer=1", "idle=yes"]
     );
     mpv.stop();
+    //mpv.clearPlaylist();
     mpv.on("idle", null, (ev, _) async {
       _setState(_State.idle);
     });
@@ -90,7 +91,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
       mpvLog("MPV $id exited", level: JAMPV_LogLevel.warning);
     });
     mpv.on(MPVEvents.timeposition, null, (ev, _) async {
-      final _duration = await mpv.getDuration().catchError((_, __) => -1);
+      final _duration = await mpv.getDuration().catchError((_, __) => -1.0);
       final _bufferedTo = await mpv.getProperty("demuxer-cache-time").catchError((_, __) => -1);
       await update(
         updatePosition: Duration(milliseconds: ((ev.eventData as double) * 1000).truncate()),
@@ -233,6 +234,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
     //mpvLog("D: ConcatenatingInsertAll", error: {"request.index": request.index, "length": length}, level: JAMPV_LogLevel.verbose);
     for (final source in request.children.reversed) {
       await _concatenatingInsert(source);
+      mpvLog("D: ConcatenatingInsertAll", error: {"request.index": request.index, "source": source}, level: JAMPV_LogLevel.verbose);
       final length = await mpv.getPlaylistSize();
       if (length == 0) continue;
       if (request.index < (length-1) && request.index >= 0) {
@@ -246,7 +248,7 @@ class JustAudioMPVPlayer extends AudioPlayerPlatform {
   @override
   Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(ConcatenatingRemoveRangeRequest request) async {
     for (var i = 0; i < request.endIndex-request.startIndex; i++) {
-      await mpv.playlistRemove(request.startIndex+i);
+      await mpv.playlistRemove(request.startIndex);
     }
     return ConcatenatingRemoveRangeResponse();
   }
