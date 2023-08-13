@@ -1,3 +1,7 @@
+## 0.1.7
+* Fix #5
+* Update README to add Flatpak instructions
+
 ## 0.1.6
 * Add a settable logging global, which prints to console by default
 

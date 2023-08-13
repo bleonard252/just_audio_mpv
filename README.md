@@ -22,7 +22,43 @@ For Fedora:
 sudo yum install mpv
 ```
 
-If your app is to be packaged as a Flatpak, you can add `io.mpv.Mpv` as a dependency (don't ask me how, I've never built for it) or bundle a custom build.
+### Build into a Flatpak
+To add MPV to a Flatpak build, add these modules to your flatpak-builder manifest:
+```yaml
+  - name: libass
+    # mpv won't build without this
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    config-opts:
+      - --disable-static
+    sources:
+      - type: archive
+        url: https://github.com/libass/libass/releases/download/0.15.0/libass-0.15.0.tar.gz
+        sha256: 9cbddee5e8c87e43a5fe627a19cd2aa4c36552156eb4edcf6c5a30bd4934fe58
+  - name: mpv
+    buildsystem: simple
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    build-commands:
+      - python3 waf configure --prefix=/app --enable-libmpv-shared --disable-build-date
+        --disable-manpage-build --disable-alsa --enable-libarchive
+        --disable-lua --disable-javascript --disable-uchardet --disable-drm --disable-dvdnav
+      - python3 waf build
+      - python3 waf install
+    post-install:
+      # save screenshots at ~/Pictures/mpv
+      - echo "screenshot-directory=~/Pictures/mpv" > /app/etc/mpv/mpv.conf
+    sources:
+      - type: archive
+        url: https://github.com/mpv-player/mpv/archive/v0.35.0.tar.gz
+        sha256: dc411c899a64548250c142bf1fa1aa7528f1b4398a24c86b816093999049ec00
+      - type: file
+        url: https://waf.io/waf-2.0.22
+        sha256: 0a09ad26a2cfc69fa26ab871cb558165b60374b5a653ff556a0c6aca63a00df1
+        dest-filename: waf
+```
 
 For other distributions, you might want to look into https://mpv.io/installation/.
 
