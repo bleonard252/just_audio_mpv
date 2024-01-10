@@ -3,6 +3,14 @@ This platform interface allows you to use `just_audio` on Linux with the user's 
 
 This uses `mpv_dart`, which uses a local socket to communicate with mpv over JSON IPC. mpv takes care of all the file loading, shuffling, looping, pretty much everything.
 
+## Comparison to `just_audio_media_kit`
+In most cases, you probably should use [`just_audio_media_kit`](https://pub.dev/packages/just_audio_media_kit) or raw [`media_kit`](https://pub.dev/packages/media_kit) instead. It's better made, better supported, much stabler, and it might even have more features.
+
+Even better would be to use a "raw" Linux audio library, but it doesn't look like anyone's making that.
+
+If the licensing scheme or legality of `media_kit` concerns you, this package might be in your interest.
+
+That being said, this package will remain supported on a best-effort basis for the foreseeable future, or until someone makes a complete, native solution to audio playback both on Linux and Windows.
 ## Installation
 **Users** with software that uses `just_audio_mpv` have to install `mpv`. A recent version is *highly recommended*. The `mpv` binary must be present in the PATH. One of the following commands should do this for you:
 
